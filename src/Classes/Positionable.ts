@@ -1,0 +1,17 @@
+let id = 0
+
+export abstract class Positionable {
+	id = id++
+
+	x: number
+	y: number
+
+	distanceTo(other: Positionable) {
+		return Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2))
+	}
+
+	constructor(x: number, y: number) {
+		this.x = x
+		this.y = y
+	}
+}
