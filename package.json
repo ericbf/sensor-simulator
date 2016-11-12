@@ -1,0 +1,23 @@
+{
+  "name": "sensor-simulator",
+  "version": "0.0.1",
+  "description": "Simulation of various sensor protocols to show improvements of some over others.",
+  "main": "index.js",
+  "scripts": {
+    "run": "node node_modules/tslint/bin/tslint --project tsconfig.json; node node_modules/typescript/bin/tsc; node build/main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erkalicious/sensor-simulator.git"
+  },
+  "author": "Eric Ferreira, Pelin Icer, Korn Sooksatra, Hema Nair",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/erkalicious/sensor-simulator/issues"
+  },
+  "homepage": "https://github.com/erkalicious/sensor-simulator#readme",
+  "dependencies": {
+    "erkalicious-prototypes": "0.0.16",
+    "requirejs": "^2.3.2"
+  }
+}

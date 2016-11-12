@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+		"noEmitOnError": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
+		"outDir": "build",
+		"rootDir": "src",
+		"strictNullChecks": true,
+		"suppressImplicitAnyIndexErrors": true,
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "noImplicitAny": true,
+        "noImplicitUseStrict": false,
+        "preserveConstEnums": true,
+        "target": "es5"
+    },
+    "exclude": [
+        "node_modules",
+		"bower_components"
+    ],
+	"buildOnSave": false,
+    "compileOnSave": false,
+    "atom": {
+        "rewriteTsconfig": false
+    }
+}
