@@ -10,7 +10,9 @@ I also recommend [SourceTree](https://www.sourcetreeapp.com) as you GUI for git 
 
 <h3>Build and Run</h3>
 
-Before you can run the project for the first time, go into the project root directory in your preferred command-line interface and run this command `npm install`. After that simply run the command `npm run-script run` to build and run the application.
+Before you can run the project for the first time, go into the project root directory in your preferred command-line interface and run this command `npm run -s setup`.
+
+After that, you only need to run the command `npm run -s run` each time to build and run the application.
 
 <h3>Making Changes</h3>
 
