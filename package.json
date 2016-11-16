@@ -4,8 +4,8 @@
   "description": "Simulation of various sensor protocols to show improvements of some over others.",
   "main": "index.js",
   "scripts": {
-    "setup": "npm install; node node_modules/typings/dist/bin.js install",
-    "run": "node node_modules/tslint/bin/tslint --project tsconfig.json; node node_modules/rimraf/bin.js build; node node_modules/typescript/bin/tsc; node build/main.js"
+    "setup": "npm install && typings install",
+    "run": "tslint --project tsconfig.json && rimraf build && tsc && node build/main.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +22,9 @@
     "requirejs": "^2.3.2"
   },
   "devDependencies": {
-    "rimraf": "^2.5.4"
+    "rimraf": "^2.5.4",
+    "tslint": "^3.15.1",
+    "typescript": "^2.0.9",
+    "typings": "^2.0.0"
   }
 }
