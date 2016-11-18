@@ -1,30 +1,29 @@
 import readline = require("readline")
-import { Sensor } from "./Classes/Sensor"
-import { Target } from "./Classes/Target"
+import { Sensor } from "./Bases/Sensor"
+import { Target } from "./Bases/Target"
 
-class AlwaysOn extends Sensor {
-	shuffle() { this.shuffling = false }
-	receiveCommunication() {}
-}
+import { LoadBalancing } from "./Classes/LoadBalancing"
+import { AlwaysOn } from "./Classes/AlwaysOn"
 
 const width = 100,
-	sensorCount = 1000,
-	targetCount = 1000,
-	maxRange = 20
+	sensorCount = 100,
+	targetCount = 100,
+	maxRange = 30
 
 function pos() {
 	return Math.floor(Math.random() * (width + 1))
 }
 
 function battery() {
-	return Math.random() * pow(maxRange) + pow(maxRange)
+	return Math.random() * pow(maxRange) + 10 * pow(maxRange)
 }
 
-const sensors: Sensor[] = [],
-	targets: Target[] = []
+const targets: Target[] = []
+
+let sensors: Sensor[] = []
 
 for (let i = 0; i < sensorCount; i++) {
-	sensors.push(new AlwaysOn(pos(), pos(), battery(), maxRange))
+	sensors.push(new LoadBalancing(pos(), pos(), battery(), maxRange))
 }
 
 for (let i = 0; i < targetCount; i++) {
@@ -55,6 +54,23 @@ for (const sensor of xSensors) {
 	}
 }
 
+upper = 0
+lower = 0
+
+for (const sensor of xSensors) {
+	// Fix the lower bound of targets to consider
+	while (xSensors[lower] && sensor.x - xSensors[lower].x < -maxRange) {
+		lower++
+	}
+
+	// Fix the upper bound of targets to consider
+	while (xSensors[upper] && sensor.x - xSensors[upper].x < maxRange) {
+		upper++
+	}
+
+	sensor.sensors = xSensors.slice(lower, upper).filter((otherSensor) => otherSensor.distanceTo(sensor) <= maxRange)
+}
+
 function pow(range: number) {
 	return range * range
 }
@@ -62,36 +78,32 @@ function pow(range: number) {
 let life = 0
 
 while (true) {
-	for (const sensor of sensors) {
-		if (!sensor.shuffling) {
-			sensor.shuffling = true
-			sensor.shuffle()
-		}
-	}
+	sensors.forEach((sensor) => sensor.preshuffle())
+	sensors.forEach((sensor) => sensor.shuffle())
 
-	if (sensors.some((sensor) => sensor.shuffling)) {
-		console.log("still shuffling")
-	}
+	let weak: Sensor = undefined as any
 
-	let weak = sensors[0]
-
-	for (const sensor of sensors) {
+	sensors = sensors.filter((sensor) => {
 		// Padding for JS roundoff error
 		if (sensor.battery - 10e-3 <= 0) {
-			for (const target of sensor.targets) {
-				target.sensors.splice(target.sensors.indexOf(sensor), 1)
-			}
+			sensor.kill()
 
-			continue
+			// console.log("died:", sensor.id, sensor.battery)
+
+			return false
 		}
 
-		if (weak.battery / pow(weak.range) > sensor.battery / pow(sensor.range)) {
+		if (!weak || weak.battery / pow(weak.range) > sensor.battery / pow(sensor.range)) {
 			weak = sensor
 		}
-	}
 
-	// If any target is uncovered, break out now
+		return true
+	})
+
+	// If any target is uncovered, break out here, after killing dead sensors
 	if (targets.some((target) => target.sensors.length === 0)) {
+		// console.log("dying!")
+
 		break
 	}
 
@@ -100,6 +112,10 @@ while (true) {
 	// console.log("iteration:", iteration)
 
 	for (const sensor of sensors) {
+		// if (sensor.range) {
+		// 	console.log(`${sensor.id}: ${sensor.battery} - ${pow(sensor.range) * iteration}`)
+		// }
+
 		sensor.battery -= pow(sensor.range) * iteration
 	}
 

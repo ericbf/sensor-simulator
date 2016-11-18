@@ -1,15 +1,17 @@
-import { Communicatable } from "../Interfaces/Communicatable"
-import { Shuffleable } from "../Interfaces/Shuffleable"
 import { Positionable } from "./Positionable"
 import { Target } from "./Target"
 
-export abstract class Sensor extends Positionable implements Communicatable, Shuffleable {
-	sensors: Communicatable[] = []
+export abstract class Sensor extends Positionable {
+	sensors: Sensor[] = []
 	targets: Target[] = []
 
 	maxRange: number
 	range: number
 	battery: number
+
+	preshuffle(): void {
+		this.shuffling = true
+	}
 
 	/**
 	 * This function should be overriden depending on the implementation. It
@@ -43,5 +45,25 @@ export abstract class Sensor extends Positionable implements Communicatable, Shu
 
 		this.battery = battery
 		this.range = this.maxRange = maxRange
+	}
+
+	communicate(...params: any[]) {
+		for (const sensor of this.sensors) {
+			sensor.receiveCommunication.apply(sensor, params)
+		}
+	}
+
+	/**
+	 * Remove this sensor from the targets and sensors with whom it is
+	 *   associated.
+	 */
+	kill() {
+		for (const target of this.targets) {
+			target.sensors.splice(target.sensors.indexOf(this), 1)
+		}
+
+		for (const sensor of this.sensors) {
+			sensor.sensors.splice(sensor.sensors.indexOf(this), 1)
+		}
 	}
 }
