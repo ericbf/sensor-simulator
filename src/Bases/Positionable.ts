@@ -1,7 +1,7 @@
 let id = 0
 
 export abstract class Positionable {
-	id = id++
+	id = String(id++)
 
 	x: number
 	y: number
