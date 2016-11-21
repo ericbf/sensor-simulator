@@ -1,36 +1,47 @@
 import { Sensor } from "../Bases/Sensor"
 import { Target } from "../Bases/Target"
+import { log } from "../main"
 
 export class LoadBalancing extends Sensor {
-	charge: Target[]
-
-	private filterCharge(sensor: Sensor) {
-		this.charge = this.charge.filter((target) => sensor.targets.indexOf(target) < 0)
-	}
+	charge: Target[] = []
+	packets: Sensor[] = []
 
 	preshuffle() {
 		super.preshuffle()
 
-		this.charge = this.targets
+		this.charge.length = 0
+		this.packets.length = 0
+
+		this.range = this.maxRange
+		this.final = false
 	}
 
 	shuffle() {
-		if (!this.shuffling) {
+		if (this.battery === 0) {
+			this.range = 0
+			this.kill()
+
 			return
 		}
 
 		let on = false
 
-		if (this.charge.some((target) => target.sensors.length === 1)) {
+		if (this.targets.some((target) => target.sensors.length === 1)) {
 			on = true
+
+			log(`A target is covered by only me: ${this.id}`)
+
+			this.final = true
 		} else {
-			for (const sensor of this.sensors) {
-				if (sensor.battery > this.battery ||
-					sensor.battery === this.battery && sensor.id > this.id ||
-					!sensor.shuffling && sensor.range) {
-					// Other sensor is stronger, or sensor is set to on. We can
-					//   release charge of the targets it covers.
-					this.filterCharge(sensor)
+			for (const target of this.targets) {
+				const richest = target.sensors.every((sensor) => {
+					return this === sensor ||
+						this.battery > sensor.battery ||
+						this.battery === sensor.battery && this.id > sensor.id
+				})
+
+				if (richest) {
+					this.charge.push(target)
 				}
 			}
 
@@ -40,23 +51,37 @@ export class LoadBalancing extends Sensor {
 			on = this.charge.length > 0
 		}
 
-		this.shuffling = false
-		this.range = on ? this.maxRange : 0
+		if (on) {
+			log(`I, ${this.id}, stayed on with ${this.charge.length} charges`)
+		}
 
-		this.communicate({
-			self: this,
-			state: on
-		})
+		this.range = on ? this.maxRange : 0
 	}
 
-	receiveCommunication(packet: any) {
-		if (packet.state) {
-			this.filterCharge(packet.self)
+	postshuffle() {
+		super.postshuffle()
+
+		this.communicate(this)
+	}
+
+	receiveCommunication(packet: LoadBalancing) {
+		if (this.range > 0 && packet.range > 0 && !this.final) {
+			log(`${packet} communicated to ${this}`)
+
+			this.charge = this.charge.filter((target) => {
+				const include = packet.targets.indexOf(target) < 0
+
+				if (!include) {
+					packet.charge.push(target)
+				}
+
+				return include
+			})
 
 			if (this.charge.length === 0) {
 				this.range = 0
 
-				this.shuffling = false
+				log("I turned off after the fact:", this.id)
 			}
 		}
 	}
