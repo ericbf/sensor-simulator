@@ -9,8 +9,9 @@ export abstract class Sensor extends Positionable {
 	range: number
 	battery: number
 
-	preshuffle(): void {
+	preshuffle() {
 		this.shuffling = true
+		this.final = false
 	}
 
 	/**
@@ -20,11 +21,16 @@ export abstract class Sensor extends Positionable {
 	 */
 	abstract shuffle(): void
 
+	postshuffle() {
+		this.shuffling = false
+	}
+
 	/**
 	 * Whether this sensor is currently shuffling, or it has settled into its
 	 *   range for the next iteration cycle.
 	 */
 	shuffling = false
+	final = false
 
 	/**
 	 * This is where this sensor receives communications from other sensors.
@@ -59,11 +65,23 @@ export abstract class Sensor extends Positionable {
 	 */
 	kill() {
 		for (const target of this.targets) {
-			target.sensors.splice(target.sensors.indexOf(this), 1)
+			const index = target.sensors.indexOf(this)
+
+			if (index >= 0) {
+				target.sensors.splice(index, 1)
+			}
 		}
 
 		for (const sensor of this.sensors) {
-			sensor.sensors.splice(sensor.sensors.indexOf(this), 1)
+			const index = sensor.sensors.indexOf(this)
+
+			if (index >= 0) {
+				sensor.sensors.splice(index, 1)
+			}
 		}
+	}
+
+	toString() {
+		return `[${this.id}: ${this.battery}]`
 	}
 }

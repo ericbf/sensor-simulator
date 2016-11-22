@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "setup": "npm install && typings install",
-    "run": "tslint --project tsconfig.json && rimraf build && tsc && node build/main.js"
+    "build": "tslint --project tsconfig.json && rimraf build && tsc",
+	"go": "node build/main.js",
+    "run": "npm run -s build && npm run -s go"
   },
   "repository": {
     "type": "git",
