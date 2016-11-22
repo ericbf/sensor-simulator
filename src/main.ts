@@ -106,7 +106,7 @@ while (true) {
 
 	sensors = sensors.filter((sensor) => {
 		// Padding for JS roundoff error
-		if (sensor.battery - 10e-3 <= 0) {
+		if (sensor.battery === 0) {
 			sensor.kill()
 
 			log("died:", sensor.id, sensor.battery)
@@ -155,6 +155,10 @@ while (true) {
 		}
 
 		sensor.battery -= sensor.range * iteration
+
+		if (sensor.battery <= 10e-3) {
+			sensor.battery = 0
+		}
 	}
 
 	life += iteration
