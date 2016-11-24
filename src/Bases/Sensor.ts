@@ -9,27 +9,20 @@ export abstract class Sensor extends Positionable {
 	range: number
 	battery: number
 
-	preshuffle() {
-		this.shuffling = true
-		this.final = false
-	}
-
 	/**
 	 * This function should be overriden depending on the implementation. It
-	 *   should involve communication with all sensors in range, and reshuffling
-	 *   of stuff this sensor's range/state.
+	 *   should load some shuffle steps after calling the `super.shuffle()`.
 	 */
-	abstract shuffle(): void
-
-	postshuffle() {
-		this.shuffling = false
+	shuffle() {
+		this.shuffleSteps.length = 0
 	}
+
+	shuffleSteps: (() => void)[] = []
 
 	/**
 	 * Whether this sensor is currently shuffling, or it has settled into its
 	 *   range for the next iteration cycle.
 	 */
-	shuffling = false
 	final = false
 
 	/**
