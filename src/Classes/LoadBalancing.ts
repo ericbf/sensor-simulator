@@ -19,12 +19,6 @@ export class LoadBalancing extends Sensor {
 		}
 
 		this.shuffleSteps.push(() => {
-			// Pre shuffle
-			this.charges.length = 0
-			this.coverers.empty()
-
-			this.range = this.maxRange
-		}, () => {
 			// Mid shuffle
 			let on = false
 
@@ -62,49 +56,5 @@ export class LoadBalancing extends Sensor {
 			// Post shuffle
 			this.communicate(this)
 		})
-	}
-
-	receiveCommunication(packet: Sensor) {
-		if (this.final) {
-			return
-		}
-
-		if (packet.range > 0 && this.range > 0) {
-			log(`${packet} communicated it was on to ${this}`)
-
-			this.charges = this.charges.filter((target) => {
-				const include = packet.targets.indexOf(target) < 0
-
-				if (!include) {
-					this.coverers.getOrPut(packet, []).push(target)
-				}
-
-				return include
-			})
-
-			if (this.charges.length === 0) {
-				this.range = 0
-
-				log("I turned off after the fact:", this.id)
-
-				this.communicate(this)
-			}
-		} else if (packet.range === 0) {
-			const targets = this.coverers.get(packet)
-
-			if (targets) {
-				log(`${packet} communicated it was off to ${this}`)
-
-				this.charges.push.apply(this.charges, targets.filter((target) => this.charges.indexOf(target) < 0))
-			}
-
-			if (this.charges.length > 0 && this.range === 0) {
-				this.range = this.maxRange
-
-				log("I turned back on:", this.id)
-
-				this.communicate(this)
-			}
-		}
 	}
 }

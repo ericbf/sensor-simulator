@@ -13,6 +13,7 @@
         "noImplicitAny": true,
         "noImplicitUseStrict": false,
         "preserveConstEnums": true,
+		"sourceMap": true,
         "target": "es5"
     },
 	"buildOnSave": false,

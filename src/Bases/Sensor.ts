@@ -1,5 +1,7 @@
 import { Positionable } from "./Positionable"
 import { Target } from "./Target"
+import { Map } from "../Classes/Map"
+import { log } from "../main"
 
 export abstract class Sensor extends Positionable {
 	sensors: Sensor[] = []
@@ -15,6 +17,14 @@ export abstract class Sensor extends Positionable {
 	 */
 	shuffle() {
 		this.shuffleSteps.length = 0
+
+		this.shuffleSteps.push(() => {
+			// Pre shuffle
+			this.charges.length = 0
+			this.coverers.empty()
+
+			this.range = this.maxRange
+		})
 	}
 
 	shuffleSteps: (() => void)[] = []
@@ -25,6 +35,9 @@ export abstract class Sensor extends Positionable {
 	 */
 	final = false
 
+	coverers = new Map<Sensor, Target[]>()
+	charges: Target[] = []
+
 	/**
 	 * This is where this sensor receives communications from other sensors.
 	 *   This is what you will call on all other sensors in reshuffle, and here
@@ -32,7 +45,49 @@ export abstract class Sensor extends Positionable {
 	 *
 	 * @param params - the parameters that were broadcasted.
 	 */
-	public abstract receiveCommunication(...params: any[]): void
+	 receiveCommunication(packet: Sensor) {
+		 if (this.final) {
+			 return
+		 }
+
+		 if (packet.range > 0 && this.range > 0) {
+			 log(`${packet} communicated it was on to ${this}`)
+
+			 this.charges = this.charges.filter((target) => {
+				 const include = packet.targets.indexOf(target) < 0
+
+				 if (!include) {
+					 this.coverers.getOrPut(packet, []).push(target)
+				 }
+
+				 return include
+			 })
+
+			 if (this.charges.length === 0) {
+				 this.range = 0
+
+				 log("I turned off after the fact:", this.id)
+
+				 this.communicate(this)
+			 }
+		 } else if (packet.range === 0) {
+			 const targets = this.coverers.get(packet)
+
+			 if (targets) {
+				 log(`${packet} communicated it was off to ${this}`)
+
+				 this.charges.push.apply(this.charges, targets.filter((target) => this.charges.indexOf(target) < 0))
+			 }
+
+			 if (this.charges.length > 0 && this.range === 0) {
+				 this.range = this.maxRange
+
+				 log("I turned back on:", this.id)
+
+				 this.communicate(this)
+			 }
+		 }
+	 }
 
 	/**
 	 * Use this to store any data needed during the execution of the protocol.
