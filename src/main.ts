@@ -147,7 +147,7 @@ while (true) {
 		if (noCoverage) {
 			log("No coverage!!")
 		} else if (allOff) {
-			log(`All off!! One of [${target.sensors.sort((l, r) => parseInt(l.id) - parseInt(r.id))}] should have stayed on...`)
+			log(`All off!! One of [${target.sensors.sort((l, r) => l.id - r.id)}] should have stayed on...`)
 		}
 
 		return noCoverage || allOff

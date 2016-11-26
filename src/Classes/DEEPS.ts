@@ -45,11 +45,11 @@ export class DEEPS extends Sensor {
 				this.final = true
 			} else {
 				// Determine the current sink for this target
-				this.sink = this.targets.reduce((heretofore, target) =>
-					DEEPS.targetLife(heretofore) > DEEPS.targetLife(target) ||
-					DEEPS.targetLife(heretofore) === DEEPS.targetLife(target) && heretofore.id > target.id ?
+				this.sink = this.targets.reduce((heretofore, current) =>
+					DEEPS.targetLife(heretofore) < DEEPS.targetLife(current) ||
+					DEEPS.targetLife(heretofore) === DEEPS.targetLife(current) && heretofore.id < current.id ?
 						heretofore :
-						target,
+						current,
 					this.targets[0])
 			}
 		}, () => {
@@ -60,8 +60,9 @@ export class DEEPS extends Sensor {
 			const thoseForWhomSinkIsSink = this.sink.sensors.filter((sensor: DEEPS) => this.sink === sensor.sink)
 
 			if (thoseForWhomSinkIsSink.every((sensor: DEEPS) =>
+				this === sensor ||
 				this.battery > sensor.battery ||
-				this.battery === sensor.battery && this.id >= sensor.id
+				this.battery === sensor.battery && this.id > sensor.id
 			)) {
 				this.charges.push(this.sink)
 			}
@@ -71,22 +72,22 @@ export class DEEPS extends Sensor {
 					target !== sensor.sink))
 
 			for (const hill of hills) {
-				const inCharge = hill.sensors.reduce((heretofore: DEEPS, sensor: DEEPS) => {
-					if (!heretofore.sink || !sensor.sink) {
+				const inCharge = hill.sensors.reduce((heretofore: DEEPS, current: DEEPS) => {
+					if (!heretofore.sink || !current.sink) {
 						throw new Error("Sink cannot be undefined here")
 					}
 
-					if (heretofore.sink === sensor.sink) {
-						return heretofore.battery > sensor.battery ||
-							heretofore.battery === sensor.battery && heretofore.id > sensor.id ?
+					if (heretofore.sink === current.sink) {
+						return heretofore.battery > current.battery ||
+							heretofore.battery === current.battery && heretofore.id > current.id ?
 								heretofore :
-								sensor
+								current
 					}
 
-					return DEEPS.targetLife(heretofore.sink) > DEEPS.targetLife(sensor.sink) ||
-						DEEPS.targetLife(heretofore.sink) === DEEPS.targetLife(sensor.sink) && heretofore.sink.id > sensor.sink.id ?
+					return DEEPS.targetLife(heretofore.sink) > DEEPS.targetLife(current.sink) ||
+						DEEPS.targetLife(heretofore.sink) === DEEPS.targetLife(current.sink) && heretofore.sink.id > current.sink.id ?
 							heretofore :
-							sensor
+							current
 				}, hill.sensors[0])
 
 				if (this === inCharge) {
