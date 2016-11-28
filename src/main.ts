@@ -3,9 +3,10 @@ import { Sensor } from "./Bases/Sensor"
 import { Target } from "./Bases/Target"
 
 import { LoadBalancing } from "./Classes/LoadBalancing"
+import { DEEPS } from "./Classes/DEEPS"
 import { AlwaysOn } from "./Classes/AlwaysOn"
 
-const debug = false
+const debug = true
 
 export function log(...params: any[]) {
 	if (debug) {
@@ -43,7 +44,7 @@ function battery() {
 }
 
 for (let i = 0; i < sensorCount; i++) {
-	sensors.push(new LoadBalancing(pos(), pos(), battery(), maxRange))
+	sensors.push(new DEEPS(pos(), pos(), battery(), maxRange))
 }
 
 for (let i = 0; i < targetCount; i++) {
@@ -98,9 +99,25 @@ log("assigned coverages")
 let life = 0
 
 while (true) {
-	sensors.forEach((sensor) => sensor.preshuffle())
 	sensors.forEach((sensor) => sensor.shuffle())
-	sensors.forEach((sensor) => sensor.postshuffle())
+
+	while (true) {
+		let hadAny = false
+
+		sensors.forEach((sensor) => {
+			const step = sensor.shuffleSteps.shift()
+
+			if (step) {
+				hadAny = true
+
+				step()
+			}
+		})
+
+		if (!hadAny) {
+			break
+		}
+	}
 
 	let weak: Sensor = undefined as any
 
@@ -130,7 +147,7 @@ while (true) {
 		if (noCoverage) {
 			log("No coverage!!")
 		} else if (allOff) {
-			log(`All off!! One of [${target.sensors.sort((l, r) => parseInt(l.id) - parseInt(r.id))}] should have stayed on...`)
+			log(`All off!! One of [${target.sensors.sort((l, r) => l.id - r.id)}] should have stayed on...`)
 		}
 
 		return noCoverage || allOff
