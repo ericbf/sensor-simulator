@@ -1,12 +1,18 @@
 import readline = require("readline")
-import { Sensor } from "./Bases/Sensor"
-import { Target } from "./Bases/Target"
 
-import { LoadBalancing } from "./Classes/LoadBalancing"
+import { Protocol } from "./Bases/Protocol"
+import { RangeHandlerStatic } from "./Bases/RangeHandler"
+
+import { Sensor } from "./Classes/Sensor"
+import { Target } from "./Classes/Target"
+
+import { LBP } from "./Classes/LBP"
 import { DEEPS } from "./Classes/DEEPS"
-import { AlwaysOn } from "./Classes/AlwaysOn"
 
-const debug = true
+import { Fixed } from "./Classes/Fixed"
+import { Adjustable } from "./Classes/Adjustable"
+
+const debug = false
 
 export function log(...params: any[]) {
 	if (debug) {
@@ -20,23 +26,35 @@ const maxDistance = 5,
 
 let sensors: Sensor[] = []
 
-// targets.push(
-// 	new Target(0, 2),
-// 	new Target(0, -2)
-// )
-// sensors.push(
-// 	new LoadBalancing(-3, 0, 50, maxRange),
-// 	new LoadBalancing(3, 0, 50, maxRange),
-// 	new LoadBalancing(0, 3, 50, maxRange),
-// 	new LoadBalancing(0, -3, 50, maxRange)
-// )
-
 const width = 10,
-	sensorCount = 100,
+	sensorCount = 50,
 	targetCount = 10
 
+const used = {} as { [x: number]: { [y: number]: boolean | undefined } | undefined }
+
 function pos() {
-	return Math.floor(Math.random() * (width + 1))
+	function rand() {
+		return Math.floor(Math.random() * (width + 1))
+	}
+
+	let x = rand(),
+		y = rand()
+
+	while (used[x] != undefined && used[x]![y]) {
+		x = rand()
+		y = rand()
+	}
+
+	if (used[x] == undefined) {
+		used[x] = {}
+	}
+
+	used[x]![y] = true
+
+	return {
+		x,
+		y
+	}
 }
 
 function battery() {
@@ -44,11 +62,15 @@ function battery() {
 }
 
 for (let i = 0; i < sensorCount; i++) {
-	sensors.push(new DEEPS(pos(), pos(), battery(), maxRange))
+	const p = pos()
+
+	sensors.push(new Sensor(DEEPS, Adjustable, p.x, p.y, battery(), maxRange))
 }
 
 for (let i = 0; i < targetCount; i++) {
-	targets.push(new Target(pos(), pos()))
+	const p = pos()
+
+	targets.push(new Target(p.x, p.y))
 }
 
 const xSensors = sensors.sort((lhs, rhs) => lhs.x - rhs.x),
@@ -75,6 +97,8 @@ for (const sensor of xSensors) {
 	for (const target of sensor.targets) {
 		target.sensors.push(sensor)
 	}
+
+	sensor.targets.sort((lhs, rhs) => sensor.distanceTo(lhs) - sensor.distanceTo(rhs))
 }
 
 upper = 0
@@ -92,16 +116,26 @@ for (const sensor of xSensors) {
 	}
 
 	sensor.sensors = xSensors.slice(lower, upper).filter((otherSensor) => otherSensor !== sensor && otherSensor.distanceTo(sensor) <= maxDistance * 2)
+	sensor.sensors.sort((lhs, rhs) => sensor.distanceTo(lhs) - sensor.distanceTo(rhs))
+}
+
+for (const target of targets) {
+	target.sensors.sort((lhs, rhs) => target.distanceTo(lhs) - target.distanceTo(rhs))
 }
 
 log("assigned coverages")
 
 let life = 0
 
-while (true) {
+iterate()
+
+function iterate() {
+	sensors.forEach((sensor) => sensor.prepare())
 	sensors.forEach((sensor) => sensor.shuffle())
 
-	while (true) {
+	runShift()
+
+	function runShift() {
 		let hadAny = false
 
 		sensors.forEach((sensor) => {
@@ -114,71 +148,67 @@ while (true) {
 			}
 		})
 
-		if (!hadAny) {
-			break
-		}
-	}
+		if (hadAny) {
+			process.nextTick(runShift)
+		} else {
+			let weak: Sensor = undefined as any
 
-	let weak: Sensor = undefined as any
+			sensors = sensors.filter((sensor) => {
+				// Padding for JS roundoff error
+				if (sensor.battery === 0) {
+					sensor.kill()
 
-	sensors = sensors.filter((sensor) => {
-		// Padding for JS roundoff error
-		if (sensor.battery === 0) {
-			sensor.kill()
+					log("died:", sensor.id, sensor.battery)
 
-			log("died:", sensor.id, sensor.battery)
+					return false
+				}
 
-			return false
-		}
+				if (!weak || weak.battery / weak.range > sensor.battery / sensor.range) {
+					weak = sensor
+				}
 
-		if (!weak || weak.battery / weak.range > sensor.battery / sensor.range) {
-			weak = sensor
-		}
-
-		return true
-	})
-
-	const dead = targets.some((target) => {
-		const noCoverage = target.sensors.length === 0,
-			allOff = !target.sensors.some((sensor) => {
-				return sensor.range > 0
+				return true
 			})
 
-		if (noCoverage) {
-			log("No coverage!!")
-		} else if (allOff) {
-			log(`All off!! One of [${target.sensors.sort((l, r) => l.id - r.id)}] should have stayed on...`)
+			const dead = targets.some((target) => {
+				const noCoverage = target.sensors.length === 0,
+				allOff = !target.sensors.some((sensor) => {
+					return sensor.range > 0
+				})
+
+				if (noCoverage) {
+					log("No coverage!!")
+				} else if (allOff) {
+					log(`All of ${target.id} off!! One of [${target.sensors.sort((l, r) => l.id - r.id)}] should have stayed on...`)
+				}
+
+				return noCoverage || allOff
+			})
+
+			// If any target is uncovered after killing dead sensors, break out here
+			if (dead) {
+				log("dying!")
+
+				console.log("life:", life)
+
+				return
+			}
+
+			const iteration = Math.min(1, weak.battery / weak.range)
+
+			log("iteration:", iteration)
+
+			for (const sensor of sensors) {
+				sensor.battery -= sensor.range * iteration
+
+				if (sensor.battery <= 10e-3) {
+					sensor.battery = 0
+				}
+			}
+
+			life += iteration
+
+			iterate()
 		}
-
-		return noCoverage || allOff
-	})
-
-	// If any target is uncovered after killing dead sensors, break out here
-	if (dead) {
-		log("dying!")
-
-		break
 	}
-
-	const iteration = Math.min(1, weak.battery / weak.range)
-
-	log("iteration:", iteration)
-
-	for (const sensor of sensors) {
-		if (sensor.range) {
-			log(`on - ${sensor.id}: ${sensor.battery} -> ${sensor.battery - sensor.range * iteration}`)
-		} else {
-			log(`off - ${sensor.id}: ${sensor.battery} -> ${sensor.battery - sensor.range * iteration}`)
-		}
-
-		sensor.battery -= sensor.range * iteration
-
-		if (sensor.battery <= 10e-3) {
-			sensor.battery = 0
-		}
-	}
-
-	life += iteration
 }
-
-console.log("life:", life)

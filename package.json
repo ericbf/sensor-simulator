@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "npm install && typings install",
     "build": "tslint --project tsconfig.json && rimraf build && tsc",
-	"go": "node build/main.js",
+    "go": "node build/main.js",
     "run": "npm run -s build && npm run -s go"
   },
   "repository": {
