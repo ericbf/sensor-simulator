@@ -8,7 +8,9 @@ import { Map } from "./Map"
 
 export module DEEPS {
 	interface DEEPSSensor extends Sensor {
-		sink: Target
+		storage: {
+			sink: Target
+		}
 	}
 
 	let needsMemoizing = true
@@ -34,38 +36,38 @@ export module DEEPS {
 			//   iteration, but save time for sensor current iteration.
 			refreshTargetLife()
 
-			sensor.sink = sensor.targets.reduce((heretofore, current) =>
+			sensor.storage.sink = sensor.targets.reduce((heretofore, current) =>
 				targetLife(heretofore) < targetLife(current) ||
 				targetLife(heretofore) === targetLife(current) && heretofore.id < current.id ?
 					heretofore :
 					current,
 				sensor.targets[0])
 		}, () => {
-			const thoseForWhomSinkIsSink = sensor.sink.sensors.filter((other: DEEPSSensor) => sensor.sink === other.sink)
+			const thoseForWhomSinkIsSink = sensor.storage.sink.sensors.filter((other: DEEPSSensor) => sensor.storage.sink === other.storage.sink)
 
 			if (thoseForWhomSinkIsSink.every((other) =>
 				sensor === other ||
-				sensor.battery / sensor.rangeHandler.rangeToCover(sensor.sink) > other.battery / other.rangeHandler.rangeToCover(sensor.sink) ||
-				sensor.battery / sensor.rangeHandler.rangeToCover(sensor.sink) === other.battery / other.rangeHandler.rangeToCover(sensor.sink) && sensor.id > other.id
+				sensor.battery / sensor.rangeHandler.rangeToCover(sensor.storage.sink) > other.battery / other.rangeHandler.rangeToCover(sensor.storage.sink) ||
+				sensor.battery / sensor.rangeHandler.rangeToCover(sensor.storage.sink) === other.battery / other.rangeHandler.rangeToCover(sensor.storage.sink) && sensor.id > other.id
 			)) {
-				sensor.charges.push(sensor.sink)
+				sensor.charges.push(sensor.storage.sink)
 			}
 
 			const hills = sensor.targets.filter((target) =>
 				target.sensors.every((other: DEEPSSensor) =>
-					target !== other.sink))
+					target !== other.storage.sink))
 
 			for (const hill of hills) {
 				const inCharge = hill.sensors.reduce((heretofore: DEEPSSensor, current: DEEPSSensor) => {
-					if (heretofore.sink === current.sink) {
-						return heretofore.battery / heretofore.rangeHandler.rangeToCover(heretofore.sink) > current.battery / current.rangeHandler.rangeToCover(current.sink) ||
-							heretofore.battery / heretofore.rangeHandler.rangeToCover(heretofore.sink) === current.battery / current.rangeHandler.rangeToCover(current.sink) && heretofore.id > current.id ?
+					if (heretofore.storage.sink === current.storage.sink) {
+						return heretofore.battery / heretofore.rangeHandler.rangeToCover(heretofore.storage.sink) > current.battery / current.rangeHandler.rangeToCover(current.storage.sink) ||
+							heretofore.battery / heretofore.rangeHandler.rangeToCover(heretofore.storage.sink) === current.battery / current.rangeHandler.rangeToCover(current.storage.sink) && heretofore.id > current.id ?
 								heretofore :
 								current
 					}
 
-					return targetLife(heretofore.sink) > targetLife(current.sink) ||
-						targetLife(heretofore.sink) === targetLife(current.sink) && heretofore.sink.id > current.sink.id ?
+					return targetLife(heretofore.storage.sink) > targetLife(current.storage.sink) ||
+						targetLife(heretofore.storage.sink) === targetLife(current.storage.sink) && heretofore.storage.sink.id > current.storage.sink.id ?
 							heretofore :
 							current
 				}, hill.sensors[0])

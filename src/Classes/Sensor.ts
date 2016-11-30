@@ -1,4 +1,4 @@
-import { Protocol } from "../Bases/Protocol"
+import { ChargeHandler } from "../Bases/ChargeHandler"
 import { RangeHandler } from "../Bases/RangeHandler"
 import { RangeHandlerStatic } from "../Bases/RangeHandler"
 import { Positionable } from "../Bases/Positionable"
@@ -16,7 +16,7 @@ export class Sensor extends Positionable {
 	maxRange: number
 	battery: number
 
-	protocol: Protocol
+	protocol: ChargeHandler
 	rangeHandler: RangeHandler
 
 	shuffleSteps = [] as (() => void)[]
@@ -25,7 +25,7 @@ export class Sensor extends Positionable {
 
 	sensorsCovering = new Map<Target, Sensor[]>()
 
-	constructor(protocol: Protocol, rangeHandlerConstructor: RangeHandlerStatic, x: number, y: number, battery: number, maxRange: number) {
+	constructor(protocol: ChargeHandler, rangeHandlerConstructor: RangeHandlerStatic, maxRange: number, x: number, y: number, battery: number) {
 		super(x, y)
 
 		this.protocol = protocol
@@ -121,7 +121,7 @@ export class Sensor extends Positionable {
 	/**
 	 * Use this to store any data needed during the execution of the protocol.
 	 */
-	storage: { [prop: string]: any }
+	storage = {} as { [prop: string]: any }
 
 	broadcast() {
 		const index = this.shuffleSteps.indexOf(this.doBroadcast)

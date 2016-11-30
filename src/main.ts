@@ -1,6 +1,4 @@
-import readline = require("readline")
-
-import { Protocol } from "./Bases/Protocol"
+import { ChargeHandler } from "./Bases/ChargeHandler"
 import { RangeHandlerStatic } from "./Bases/RangeHandler"
 
 import { Sensor } from "./Classes/Sensor"
@@ -20,13 +18,8 @@ export function log(...params: any[]) {
 	}
 }
 
-const maxDistance = 5,
-	maxRange = Math.pow(maxDistance, 2),
-	targets: Target[] = []
-
-let sensors: Sensor[] = []
-
-const width = 10,
+const width = 20,
+	maxDistance = 10,
 	sensorCount = 50,
 	targetCount = 10
 
@@ -57,158 +50,202 @@ function pos() {
 	}
 }
 
+const maxRange = Math.pow(maxDistance, 2)
+
 function battery() {
 	return Math.random() * maxRange + 5 * maxRange
 }
 
+const sensorVars = [] as { x: number, y: number, b: number }[],
+	targetVars = [] as { x: number, y: number }[]
+
 for (let i = 0; i < sensorCount; i++) {
 	const p = pos()
 
-	sensors.push(new Sensor(DEEPS, Adjustable, p.x, p.y, battery(), maxRange))
+	sensorVars.push({
+		x: p.x,
+		y: p.y,
+		b: battery()
+	})
 }
 
 for (let i = 0; i < targetCount; i++) {
 	const p = pos()
 
-	targets.push(new Target(p.x, p.y))
+	targetVars.push({
+		x: p.x,
+		y: p.y
+	})
 }
 
-const xSensors = sensors.sort((lhs, rhs) => lhs.x - rhs.x),
-	xTargets = targets.sort((lhs, rhs) => lhs.x - rhs.x)
+type Protocol = {
+	name: string,
+	range: RangeHandlerStatic,
+	charge: ChargeHandler
+}
 
-log("will assign coverages")
+const protocols = [{
+	name: "Fixed Range LPB",
+	range: Fixed,
+	charge: LBP
+}, {
+	name: "Adjustable Range LPB",
+	range: Adjustable,
+	charge: LBP
+}, {
+	name: "Fixed Range DEEPS",
+	range: Fixed,
+	charge: DEEPS
+}, {
+	name: "Adjustable Range DEEPS",
+	range: Adjustable,
+	charge: DEEPS
+}] as Protocol[]
 
-let upper = 0,
+protocols.forEach(run)
+
+function run(protocol: Protocol) {
+	let targets = targetVars
+			.map((v) => new Target(v.x, v.y))
+			.sort((lhs, rhs) => lhs.x - rhs.x),
+		sensors = sensorVars
+			.map((v) => new Sensor(protocol.charge, protocol.range, maxRange, v.x, v.y, v.b))
+			.sort((lhs, rhs) => lhs.x - rhs.x)
+
+	log("will assign coverages")
+
+	let upper = 0,
+		lower = 0
+
+	for (const sensor of sensors) {
+		// Fix the lower bound of targets to consider
+		while (targets[lower] && sensor.x - targets[lower].x > maxDistance) {
+			lower++
+		}
+
+		// Fix the upper bound of targets to consider
+		while (targets[upper] && sensor.x - targets[upper].x >= -maxDistance) {
+			upper++
+		}
+
+		sensor.targets = targets.slice(lower, upper).filter((target) => target.distanceTo(sensor) <= maxDistance)
+
+		for (const target of sensor.targets) {
+			target.sensors.push(sensor)
+		}
+
+		sensor.targets.sort((lhs, rhs) => sensor.distanceTo(lhs) - sensor.distanceTo(rhs))
+	}
+
+	upper = 0
 	lower = 0
 
-for (const sensor of xSensors) {
-	// Fix the lower bound of targets to consider
-	while (xTargets[lower] && sensor.x - xTargets[lower].x > maxDistance) {
-		lower++
+	for (const sensor of sensors) {
+		// Fix the lower bound of targets to consider
+		while (sensors[lower] && sensor.x - sensors[lower].x > maxDistance * 2) {
+			lower++
+		}
+
+		// Fix the upper bound of targets to consider
+		while (sensors[upper] && sensor.x - sensors[upper].x >= -maxDistance * 2) {
+			upper++
+		}
+
+		sensor.sensors = sensors.slice(lower, upper).filter((otherSensor) => otherSensor !== sensor && otherSensor.distanceTo(sensor) <= maxDistance * 2)
+		sensor.sensors.sort((lhs, rhs) => sensor.distanceTo(lhs) - sensor.distanceTo(rhs))
 	}
 
-	// Fix the upper bound of targets to consider
-	while (xTargets[upper] && sensor.x - xTargets[upper].x >= -maxDistance) {
-		upper++
+	for (const target of targets) {
+		target.sensors.sort((lhs, rhs) => target.distanceTo(lhs) - target.distanceTo(rhs))
 	}
 
-	sensor.targets = xTargets.slice(lower, upper).filter((target) => target.distanceTo(sensor) <= maxDistance)
+	log("assigned coverages")
 
-	for (const target of sensor.targets) {
-		target.sensors.push(sensor)
-	}
+	let life = 0
 
-	sensor.targets.sort((lhs, rhs) => sensor.distanceTo(lhs) - sensor.distanceTo(rhs))
-}
+	iterate()
 
-upper = 0
-lower = 0
+	function iterate() {
+		sensors.forEach((sensor) => sensor.prepare())
+		sensors.forEach((sensor) => sensor.shuffle())
 
-for (const sensor of xSensors) {
-	// Fix the lower bound of targets to consider
-	while (xSensors[lower] && sensor.x - xSensors[lower].x > maxDistance * 2) {
-		lower++
-	}
+		runShift()
 
-	// Fix the upper bound of targets to consider
-	while (xSensors[upper] && sensor.x - xSensors[upper].x >= -maxDistance * 2) {
-		upper++
-	}
+		function runShift() {
+			let hadAny = false
 
-	sensor.sensors = xSensors.slice(lower, upper).filter((otherSensor) => otherSensor !== sensor && otherSensor.distanceTo(sensor) <= maxDistance * 2)
-	sensor.sensors.sort((lhs, rhs) => sensor.distanceTo(lhs) - sensor.distanceTo(rhs))
-}
+			sensors.forEach((sensor) => {
+				const step = sensor.shuffleSteps.shift()
 
-for (const target of targets) {
-	target.sensors.sort((lhs, rhs) => target.distanceTo(lhs) - target.distanceTo(rhs))
-}
+				if (step) {
+					hadAny = true
 
-log("assigned coverages")
-
-let life = 0
-
-iterate()
-
-function iterate() {
-	sensors.forEach((sensor) => sensor.prepare())
-	sensors.forEach((sensor) => sensor.shuffle())
-
-	runShift()
-
-	function runShift() {
-		let hadAny = false
-
-		sensors.forEach((sensor) => {
-			const step = sensor.shuffleSteps.shift()
-
-			if (step) {
-				hadAny = true
-
-				step()
-			}
-		})
-
-		if (hadAny) {
-			process.nextTick(runShift)
-		} else {
-			let weak: Sensor = undefined as any
-
-			sensors = sensors.filter((sensor) => {
-				// Padding for JS roundoff error
-				if (sensor.battery === 0) {
-					sensor.kill()
-
-					log("died:", sensor.id, sensor.battery)
-
-					return false
+					step()
 				}
-
-				if (!weak || weak.battery / weak.range > sensor.battery / sensor.range) {
-					weak = sensor
-				}
-
-				return true
 			})
 
-			const dead = targets.some((target) => {
-				const noCoverage = target.sensors.length === 0,
-				allOff = !target.sensors.some((sensor) => {
-					return sensor.range > 0
+			if (hadAny) {
+				process.nextTick(runShift)
+			} else {
+				let weak: Sensor = undefined as any
+
+				sensors = sensors.filter((sensor) => {
+					// Padding for JS roundoff error
+					if (sensor.battery === 0) {
+						sensor.kill()
+
+						log("died:", sensor.id, sensor.battery)
+
+						return false
+					}
+
+					if (!weak || weak.battery / weak.range > sensor.battery / sensor.range) {
+						weak = sensor
+					}
+
+					return true
 				})
 
-				if (noCoverage) {
-					log("No coverage!!")
-				} else if (allOff) {
-					log(`All of ${target.id} off!! One of [${target.sensors.sort((l, r) => l.id - r.id)}] should have stayed on...`)
+				const dead = targets.some((target) => {
+					const noCoverage = target.sensors.length === 0,
+					allOff = !target.sensors.some((sensor) => {
+						return sensor.range > 0
+					})
+
+					if (noCoverage) {
+						log("No coverage!!")
+					} else if (allOff) {
+						log(`All of ${target.id} off!! One of [${target.sensors.sort((l, r) => l.id - r.id)}] should have stayed on...`)
+					}
+
+					return noCoverage || allOff
+				})
+
+				// If any target is uncovered after killing dead sensors, break out here
+				if (dead) {
+					log("dying!")
+
+					console.log(`${protocol.name}: ${life}`)
+
+					return
 				}
 
-				return noCoverage || allOff
-			})
+				const iteration = Math.min(1, weak.battery / weak.range)
 
-			// If any target is uncovered after killing dead sensors, break out here
-			if (dead) {
-				log("dying!")
+				log("iteration:", iteration)
 
-				console.log("life:", life)
+				for (const sensor of sensors) {
+					sensor.battery -= sensor.range * iteration
 
-				return
-			}
-
-			const iteration = Math.min(1, weak.battery / weak.range)
-
-			log("iteration:", iteration)
-
-			for (const sensor of sensors) {
-				sensor.battery -= sensor.range * iteration
-
-				if (sensor.battery <= 10e-3) {
-					sensor.battery = 0
+					if (sensor.battery <= 10e-3) {
+						sensor.battery = 0
+					}
 				}
+
+				life += iteration
+
+				iterate()
 			}
-
-			life += iteration
-
-			iterate()
 		}
 	}
 }

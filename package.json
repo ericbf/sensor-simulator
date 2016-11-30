@@ -20,7 +20,6 @@
   },
   "homepage": "https://github.com/erkalicious/sensor-simulator#readme",
   "dependencies": {
-    "readline": "^1.3.0",
     "requirejs": "^2.3.2"
   },
   "devDependencies": {
