@@ -18,10 +18,11 @@ export function log(...params: any[]) {
 	}
 }
 
-const width = 20,
-	maxDistance = 10,
+const width = 8,
+	maxDistance = 2,
 	sensorCount = 50,
-	targetCount = 10
+	targetCount = 10,
+	maxRange = Math.pow(maxDistance, 2)
 
 const used = {} as { [x: number]: { [y: number]: boolean | undefined } | undefined }
 
@@ -50,8 +51,6 @@ function pos() {
 	}
 }
 
-const maxRange = Math.pow(maxDistance, 2)
-
 function battery() {
 	return Math.random() * maxRange + 5 * maxRange
 }
@@ -78,6 +77,93 @@ for (let i = 0; i < targetCount; i++) {
 	})
 }
 
+// const sensorVars = [{
+// 		x: 0,
+// 		y: 0,
+// 		b: 8 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 0,
+// 		b: 8 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 0,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}, {
+// 		x: 2,
+// 		y: 2,
+// 		b: 1 * maxRange
+// 	}],
+// 	targetVars = [{
+// 		x: 1,
+// 		y: 0
+// 	}, {
+// 		x: 0,
+// 		y: 1
+// 	}, {
+// 		x: 2,
+// 		y: 1
+// 	}]
+
+sensorVars.sort((lhs, rhs) => lhs.x - rhs.x)
+targetVars.sort((lhs, rhs) => lhs.x - rhs.x)
+
 type Protocol = {
 	name: string,
 	range: RangeHandlerStatic,
@@ -89,30 +175,30 @@ const protocols = [{
 	range: Fixed,
 	charge: LBP
 }, {
-	name: "Adjustable Range LPB",
-	range: Adjustable,
-	charge: LBP
-}, {
 	name: "Fixed Range DEEPS",
 	range: Fixed,
 	charge: DEEPS
+}, {
+	name: "Adjustable Range LPB",
+	range: Adjustable,
+	charge: LBP
 }, {
 	name: "Adjustable Range DEEPS",
 	range: Adjustable,
 	charge: DEEPS
 }] as Protocol[]
 
-protocols.forEach(run)
+run(protocols)
 
-function run(protocol: Protocol) {
-	let targets = targetVars
-			.map((v) => new Target(v.x, v.y))
-			.sort((lhs, rhs) => lhs.x - rhs.x),
-		sensors = sensorVars
-			.map((v) => new Sensor(protocol.charge, protocol.range, maxRange, v.x, v.y, v.b))
-			.sort((lhs, rhs) => lhs.x - rhs.x)
+function run(protocols: Protocol[]) {
+	const protocol = protocols.shift()!
 
-	log("will assign coverages")
+	if (!protocol) {
+		return
+	}
+
+	let sensors = sensorVars.map((v) => new Sensor(protocol.charge, protocol.range, maxRange, v.x, v.y, v.b)),
+		targets = targetVars.map((v) => new Target(v.x, v.y))
 
 	let upper = 0,
 		lower = 0
@@ -159,8 +245,6 @@ function run(protocol: Protocol) {
 		target.sensors.sort((lhs, rhs) => target.distanceTo(lhs) - target.distanceTo(rhs))
 	}
 
-	log("assigned coverages")
-
 	let life = 0
 
 	iterate()
@@ -194,8 +278,6 @@ function run(protocol: Protocol) {
 					if (sensor.battery === 0) {
 						sensor.kill()
 
-						log("died:", sensor.id, sensor.battery)
-
 						return false
 					}
 
@@ -223,18 +305,20 @@ function run(protocol: Protocol) {
 
 				// If any target is uncovered after killing dead sensors, break out here
 				if (dead) {
-					log("dying!")
-
 					console.log(`${protocol.name}: ${life}`)
 
-					return
+					return run(protocols)
 				}
+
+				log("Iteration:")
 
 				const iteration = Math.min(1, weak.battery / weak.range)
 
-				log("iteration:", iteration)
-
 				for (const sensor of sensors) {
+					if (sensor.range > 0) {
+						log(`${sensor.id}: ${sensor.battery / sensor.range}`)
+					}
+
 					sensor.battery -= sensor.range * iteration
 
 					if (sensor.battery <= 10e-3) {

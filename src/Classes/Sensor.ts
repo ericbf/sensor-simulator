@@ -23,7 +23,7 @@ export class Sensor extends Positionable {
 	charges = [] as Target[]
 	unfilteredCharges = [] as Target[]
 
-	sensorsCovering = new Map<Target, Sensor[]>()
+	coverers = new Map<Target, {[id: string]: Sensor}>()
 
 	constructor(protocol: ChargeHandler, rangeHandlerConstructor: RangeHandlerStatic, maxRange: number, x: number, y: number, battery: number) {
 		super(x, y)
@@ -36,7 +36,7 @@ export class Sensor extends Positionable {
 	}
 
 	prepare() {
-		this.sensorsCovering.empty()
+		this.coverers.empty()
 
 		this.rangeHandler.reset()
 	}
@@ -59,7 +59,6 @@ export class Sensor extends Positionable {
 		this.protocol.pushSteps(this)
 
 		this.shuffleSteps.push(() => {
-			this.charges.sort((lhs, rhs) => this.distanceTo(lhs) - this.distanceTo(rhs))
 			this.unfilteredCharges = this.charges.slice(0)
 		})
 
@@ -77,30 +76,25 @@ export class Sensor extends Positionable {
 		let changed = false
 
 		for (const target of this.unfilteredCharges) {
-			const sensorsCovering = this.sensorsCovering.getOrPut(target, []),
-				sensorIndex = sensorsCovering.indexOf(sensor),
-				chargeIndex = this.charges.indexOf(target)
+			const coverers = this.coverers.getOrPut(target, {}),
+				iCharge = this.charges.indexOf(target)
 
 			if (sensor.rangeTo(target) <= sensor.range) {
 				// Covered by the sensor who communicated
-				if (sensorIndex <= 0) {
-					sensorsCovering.push(sensor)
-				}
+				coverers[sensor.id] = sensor
 
-				if (chargeIndex >= 0) {
+				if (iCharge >= 0) {
 					// Remove this from my charges if I was in charge of it. He
 					//   will take care of it for me.
-					this.charges.splice(chargeIndex, 1)
+					this.charges.splice(iCharge, 1)
 
 					changed = true
 				}
 			} else {
 				// NOT covered by the sensor who communicated
-				if (sensorIndex >= 0) {
-					sensorsCovering.splice(sensorIndex, 1)
-				}
+				delete coverers[sensor.id]
 
-				if (sensorsCovering.length === 0 && chargeIndex < 0) {
+				if (Object.keys(coverers).length === 0 && iCharge < 0) {
 					// Totally uncovered except by me. Add back to my charges!
 					this.charges.push(target)
 
@@ -110,11 +104,13 @@ export class Sensor extends Positionable {
 		}
 
 		if (changed) {
-			log(`${this} changed charges because of ${sensor}`)
+			const oldRange = this.range
 
-			this.charges.sort((lhs, rhs) => this.distanceTo(lhs) - this.distanceTo(rhs))
 			this.rangeHandler.coverCharges()
-			this.broadcast()
+
+			if (this.range !== oldRange) {
+				this.broadcast()
+			}
 		}
 	}
 

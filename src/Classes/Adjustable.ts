@@ -13,10 +13,14 @@ export class Adjustable extends RangeHandler {
 	}
 
 	reset() {
+		this.delegate.charges.sort((lhs, rhs) => this.delegate.rangeTo(lhs) - this.delegate.rangeTo(rhs))
+
 		this.rangeSensor(this.delegate.targets[this.delegate.targets.length - 1])
 	}
 
 	coverCharges() {
+		this.delegate.charges.sort((lhs, rhs) => this.delegate.rangeTo(lhs) - this.delegate.rangeTo(rhs))
+		
 		this.rangeSensor(this.delegate.charges[this.delegate.charges.length - 1])
 	}
 
