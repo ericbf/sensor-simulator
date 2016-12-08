@@ -1,111 +1,107 @@
-import { Sensor } from "../Bases/Sensor"
-import { Target } from "../Bases/Target"
-import { log } from "../main"
-import { Map } from "./Map"
 import "../Bases/Function"
 
-export class DEEPS extends Sensor {
-	sink: Target | undefined
+import { log } from "../main"
 
-	static needsMemoizing = true
+import { Sensor } from "./Sensor"
+import { Target } from "./Target"
+import { Map } from "./Map"
 
-	/* calculate the battery life of targets */
-	private static targetLife: (target: Target) => number
+export module DEEPS {
+	interface DEEPSSensor extends Sensor {
+		// The sink!
+		storage: Target
+	}
 
-	private static refreshTargetLife() {
-		if (DEEPS.needsMemoizing) {
-			DEEPS.needsMemoizing = false
+	let needsMemoizing = true
 
-			DEEPS.targetLife = ((target: Target) =>
-				target.sensors.reduce((trans, sensor) =>
-					trans + sensor.battery / sensor.range, 0)).memoize()
+	// calculate the battery life of targets
+	let targetLife: (target: Target) => number
+	let isHill: (target: Target) => boolean
+
+	function refreshFunctions() {
+		if (needsMemoizing) {
+			needsMemoizing = false
+
+			targetLife = ((target: Target) => {
+				const r = target.sensors.reduce((trans, sensor) =>
+					trans + richness(sensor, target), 0)
+
+				log(`T${target.id}: ${r}`)
+
+				return r
+			}).memoize()
+
+			isHill = ((target: Target) =>
+				target.sensors.every((sensor: DEEPSSensor) =>
+					target !== sensor.storage)).memoize()
 		}
 	}
 
-	shuffle() {
-		super.shuffle()
+	function richness(sensor: Sensor, target: Target) {
+		return sensor.battery / sensor.rangeHandler.rangeToCover(target)
+	}
 
-		if (this.battery === 0) {
-			this.range = 0
-			this.kill()
-
-			return
-		}
-
-		// Rememoize this function to catch any changes since the last
-		//   iteration, but save time for this current iteration.
-		DEEPS.refreshTargetLife()
-
-		this.shuffleSteps.push(() => {
-			let on = false
-
-			if (this.targets.some((target) => target.sensors.length === 1)) {
-				log(`A target is coverers by only me, ${this.id}.`)
-
-				this.final = true
-			} else {
-				// Determine the current sink for this target
-				this.sink = this.targets.reduce((heretofore, current) =>
-					DEEPS.targetLife(heretofore) < DEEPS.targetLife(current) ||
-					DEEPS.targetLife(heretofore) === DEEPS.targetLife(current) && heretofore.id < current.id ?
-						heretofore :
-						current,
-					this.targets[0])
-			}
+	export function pushSteps(sensor: DEEPSSensor) {
+		sensor.shuffleSteps.push(() => {
+			needsMemoizing = true
 		}, () => {
-			if (!this.sink || this.final) {
-				return
-			}
+			// Rememoize sensor function to catch any changes since the last
+			//   iteration, but save time for sensor current iteration.
+			refreshFunctions()
 
-			const thoseForWhomSinkIsSink = this.sink.sensors.filter((sensor: DEEPS) => this.sink === sensor.sink)
+			// Let sink be a target t which is poorest for at least one sensor
+			//   covering t.
+			sensor.storage = sensor.targets.reduce((heretofore, current) =>
+				targetLife(heretofore) < targetLife(current) ||
+				targetLife(heretofore) === targetLife(current) && heretofore.id < current.id ?
+					heretofore :
+					current)
+		}, () => {
+			// If target t is a sink, then the richest among sensors for which t
+			//   is the poorest is placed in charge of t.
+			const thoseWithSameSink = sensor.storage.sensors.filter((other: DEEPSSensor) => sensor.storage === other.storage)
 
-			if (thoseForWhomSinkIsSink.every((sensor: DEEPS) =>
-				this === sensor ||
-				this.battery > sensor.battery ||
-				this.battery === sensor.battery && this.id > sensor.id
+			if (thoseWithSameSink.every((other: DEEPSSensor) =>
+				sensor === other ||
+				richness(sensor, sensor.storage) > richness(other, other.storage) ||
+				richness(sensor, sensor.storage) === richness(other, other.storage) && sensor.id > other.id
 			)) {
-				this.charges.push(this.sink)
+				sensor.charges.push(sensor.storage)
 			}
 
-			const hills = this.targets.filter((target) =>
-				target.sensors.every((sensor: DEEPS) =>
-					target !== sensor.sink))
+			// hill, i.e., a target which is not the poorest for any of covering
+			//   sensors
+			const hills = sensor.targets.filter(isHill)
 
 			for (const hill of hills) {
-				const inCharge = hill.sensors.reduce((heretofore: DEEPS, current: DEEPS) => {
-					if (!heretofore.sink || !current.sink) {
-						throw new Error("Sink cannot be undefined here")
+				// If target t is a hill then the sensor s covering t whose
+				//   poorest target is the richest over all sensors covering t,
+				//   is placed in charge of t. If there are several such
+				//   sensors, i.e., several sensors with the same poorest
+				//   target, then the richest among them is placed in charge of
+				//   t.
+				const inCharge = hill.sensors.every((other: DEEPSSensor) => {
+					if (sensor === other) {
+						return true
 					}
 
-					if (heretofore.sink === current.sink) {
-						return heretofore.battery > current.battery ||
-							heretofore.battery === current.battery && heretofore.id > current.id ?
-								heretofore :
-								current
+					if (sensor.storage === other.storage) {
+						return richness(sensor, sensor.storage) > richness(other, other.storage) ||
+							richness(sensor, sensor.storage) === richness(other, other.storage) && sensor.id > other.id
 					}
 
-					return DEEPS.targetLife(heretofore.sink) > DEEPS.targetLife(current.sink) ||
-						DEEPS.targetLife(heretofore.sink) === DEEPS.targetLife(current.sink) && heretofore.sink.id > current.sink.id ?
-							heretofore :
-							current
-				}, hill.sensors[0])
+					return targetLife(sensor.storage) > targetLife(other.storage) ||
+						targetLife(sensor.storage) === targetLife(other.storage) && sensor.storage.id > other.storage.id
+				})
 
-				if (this === inCharge) {
-					this.charges.push(hill)
+				if (inCharge) {
+					sensor.charges.push(hill)
 				}
 			}
 
-			if (this.charges.length === 0) {
-				this.range = 0
-
-				log(`I, ${this.id}, turned off (no charges).`)
-			} else {
-				log(`I, ${this.id}, stayed on with ${this.charges.length} charges.`)
-			}
-		}, () => {
-			this.communicate(this)
-
-			DEEPS.needsMemoizing = true
+			// We are either awake or not, based on whether we are in charges of
+			//   any targets.
+			sensor.rangeHandler.coverCharges()
 		})
 	}
 }
