@@ -1,7 +1,5 @@
 import "../Bases/Function"
 
-import { log } from "../main"
-
 import { Sensor } from "./Sensor"
 import { Target } from "./Target"
 import { Map } from "./Map"
@@ -25,8 +23,6 @@ export module DEEPS {
 			targetLife = ((target: Target) => {
 				const r = target.sensors.reduce((trans, sensor) =>
 					trans + richness(sensor, target), 0)
-
-				log(`T${target.id}: ${r}`)
 
 				return r
 			}).memoize()

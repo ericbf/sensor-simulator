@@ -4,7 +4,13 @@ import { Sensor } from "./Sensor"
 import { Target } from "./Target"
 
 export class Adjustable extends RangeHandler {
-	private rangeSensor(toTarget: Target | undefined) {
+	private cover(targets: Target[]) {
+		const toTarget = targets.reduce((trans, current) => {
+			return this.delegate.rangeTo(trans) > this.delegate.rangeTo(current) ?
+				trans :
+				current
+		}, targets[0])
+
 		if (toTarget) {
 			this.delegate.range = this.delegate.rangeTo(toTarget)
 		} else {
@@ -13,15 +19,11 @@ export class Adjustable extends RangeHandler {
 	}
 
 	reset() {
-		this.delegate.charges.sort((lhs, rhs) => this.delegate.rangeTo(lhs) - this.delegate.rangeTo(rhs))
-
-		this.rangeSensor(this.delegate.targets[this.delegate.targets.length - 1])
+		this.cover(this.delegate.targets)
 	}
 
 	coverCharges() {
-		this.delegate.charges.sort((lhs, rhs) => this.delegate.rangeTo(lhs) - this.delegate.rangeTo(rhs))
-		
-		this.rangeSensor(this.delegate.charges[this.delegate.charges.length - 1])
+		this.cover(this.delegate.charges)
 	}
 
 	rangeToCover(target: Target) {
