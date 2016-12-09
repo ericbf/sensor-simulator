@@ -5,7 +5,6 @@ import { Positionable } from "../Bases/Positionable"
 
 import { Target } from "./Target"
 import { Map } from "../Classes/Map"
-import { log } from "../main"
 
 export class Sensor extends Positionable {
 	sensors: Sensor[] = []

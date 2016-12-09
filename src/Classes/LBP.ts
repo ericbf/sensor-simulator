@@ -1,6 +1,5 @@
 import { Sensor } from "./Sensor"
 import { Target } from "./Target"
-import { log } from "../main"
 
 export module LBP {
 	function richness(sensor: Sensor, target: Target) {
